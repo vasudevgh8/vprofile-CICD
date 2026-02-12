@@ -14,7 +14,7 @@ on:
     - cron: "10 14 * * 1-5"   # After noon 2:10 pm, Mondat to Friday
 
 env:
-  ECR_REPOSITORY: 'vprofile-appimg'
+  ECR_REPOSITORY: 'vprofile-appimage'
   
 permissions: 
   contents: read
@@ -88,8 +88,8 @@ jobs:
           name: trivy-scan-results
           path: trivy-results.json
 
-  BUILD_AND_PUSH_DOCKER_IMAGE:
-    name: BUILD AND PUSH DOCKER IMAGE
+  BUILD_AND_PUBLISH:
+    name: BUILD_AND_PUBLISH
     runs-on: ubuntu-latest
     environment: production
     needs: [Build, Testing, Security_Scan]
@@ -98,24 +98,24 @@ jobs:
       - name: Code checkout
         uses: actions/checkout@v4
         with:
-        fetch-depth: 0
+          fetch-depth: 0
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-      
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+          aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Build, tag, and push Docker image to Amazon ECR
-        id: build-and-push
+      - name: Login to Amazon ECR
+        id: login-ecr 
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f Docker-files/app/multistage/Dockerfile .
+          docker build -f Docker-files/app/multistage/Dockerfile -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
